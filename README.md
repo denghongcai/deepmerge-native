@@ -1,6 +1,4 @@
-# Node Native Extension Boilerplate
-
-[![Build Status](https://travis-ci.org/fcanas/node-native-boilerplate.svg)](https://travis-ci.org/fcanas/node-native-boilerplate)
+# deepmerge-native
 
 A very approachable node native extension.
 
@@ -26,15 +24,10 @@ After building:
 
 ```node
 $ node
-> var NativeExtension = require('./')
+> var merge = require('./')
 undefined
-> NativeExtension.aString()
-'This is a thing.'
-> NativeExtension.aBoolean()
-false
-> NativeExtension.nothing()
-undefined
-> 
+> merge({a: 1, c: 3}, {a: 2, b: 1})
+{a: 2, b: 1, c: 3}
 ```
 
 ### To run tests:
@@ -54,6 +47,6 @@ $ npm test -- watch
 File | Contents
 -------------|----------------
 `NativeExtension.cc` | Represents the top level of the module. C++ constructs that are exposed to javascript are exported here
-`functions.cc` | Example top-level functions. These functions demonstrate how to build and return various js types.
+`functions.cc` | top-level functions. These functions demonstrate how to build and return various js types.
 `index.js` | The main entry point for the node dependency
 `binding.gyp` | Describes your node native extention to the build system (`node-gyp`). As you add source files to the project, you should also add them to the binding file.

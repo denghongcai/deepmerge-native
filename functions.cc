@@ -1,76 +1,93 @@
 #include "functions.h"
 
-NAN_METHOD(nothing) {
+// TODO refactor to v8::Value member
+v8::Local<v8::Value> Clone(v8::Local<v8::Value> src) {
+    if (src->IsObject()) {
+        v8::Local<v8::Object> shallowSrc = Nan::To<v8::Object>(src).ToLocalChecked()->Clone();
+        v8::Local<v8::Array> keys = Nan::GetOwnPropertyNames(shallowSrc).ToLocalChecked();
+        uint32_t length = keys->Length();
+        for(uint32_t i = 0; i < length; i++) {
+            v8::Local<v8::Value> key = Nan::Get(keys, i).ToLocalChecked();
+            v8::Local<v8::Value> value = Nan::Get(shallowSrc, key).ToLocalChecked();
+            if (value->IsObject()) {
+                Nan::Set(shallowSrc, key, Clone(value));
+            }
+        }
+        return shallowSrc;
+    }
+    return src;
 }
 
-NAN_METHOD(aString) {
-    info.GetReturnValue().Set(Nan::New("This is a thing.").ToLocalChecked());
+// TODO refactor to v8::Array member
+bool IndexOf(v8::Local<v8::Array> arr, v8::Local<v8::Value> value) {
+    uint32_t arrLength = arr->Length();
+    for(uint32_t i = 0; i < arrLength; i++) {
+        v8::Local<v8::Value> curValue = Nan::Get(arr, i).ToLocalChecked();
+        if (curValue->StrictEquals(value)) return true;
+    }
+    return false;
 }
 
-NAN_METHOD(aBoolean) {
-    info.GetReturnValue().Set(false);
+v8::Local<v8::Value> DeepMergeRecursive(v8::Local<v8::Value> target, v8::Local<v8::Value> src) {
+    const bool isSrcArray = src->IsArray();
+    if (isSrcArray) {
+        v8::Local<v8::Value> dst;
+        v8::Local<v8::Array> srcArray = v8::Local<v8::Array>::Cast(src);
+        if (target->IsUndefined() || target->IsNull()) {
+            dst = Nan::New<v8::Array>();
+        } else {
+            dst = Clone(target);
+        }
+        v8::Local<v8::Array> dstArray = v8::Local<v8::Array>::Cast(dst);
+        uint32_t srcArrayLength = srcArray->Length();
+        for(uint32_t i = 0; i < srcArrayLength; i++) {
+            v8::Local<v8::Value> value = Nan::Get(srcArray, i).ToLocalChecked();
+            if (Nan::Get(dstArray, i).ToLocalChecked()->IsUndefined()) {
+                Nan::Set(dstArray, i, value);
+            } else if (value->IsObject()) {
+                Nan::Set(dstArray, i, DeepMergeRecursive(Nan::Get(dstArray, i).ToLocalChecked(), value));
+            } else {
+                if (!IndexOf(dstArray, value)) {
+                    Nan::Set(dstArray, dstArray->Length(), value); 
+                }
+            }
+        }
+        return dst;
+    } else {
+        v8::Local<v8::Object> dst;
+        if (!target->IsNull() && target->IsObject()) {
+            dst = v8::Local<v8::Object>::Cast(Clone(target));
+        } else {
+            dst = Nan::New<v8::Object>();
+        }
+        v8::Local<v8::Object> srcObj = v8::Local<v8::Object>::Cast(src);
+        v8::Local<v8::Array> keys = Nan::GetOwnPropertyNames(srcObj).ToLocalChecked();
+        uint32_t keysLength = keys->Length();
+        for (uint32_t i = 0; i < keysLength; i++) {
+            v8::Local<v8::Value> key = Nan::Get(keys, i).ToLocalChecked();
+            v8::Local<v8::Value> value = Nan::Get(srcObj, key).ToLocalChecked();
+            if (!value->IsObject() || value->IsNull()) {
+                Nan::Set(dst, key, value);
+            } else {
+                v8::Local<v8::Object> targetObj = v8::Local<v8::Object>::Cast(target);
+                v8::Local<v8::Value> targetValue = Nan::Get(targetObj, key).ToLocalChecked();
+                if (targetValue->IsUndefined()) {
+                    Nan::Set(dst, key, value);
+                } else {
+                    Nan::Set(dst, key, DeepMergeRecursive(targetValue, value));
+                }
+            }
+        }
+        return v8::Local<v8::Value>::Cast(dst);
+    }
 }
 
-NAN_METHOD(aNumber) {
-    info.GetReturnValue().Set(1.75);
-}
-
-NAN_METHOD(anObject) {
-    v8::Local<v8::Object> obj = Nan::New<v8::Object>();
-    Nan::Set(obj, Nan::New("key").ToLocalChecked(), Nan::New("value").ToLocalChecked());
-    info.GetReturnValue().Set(obj);
-}
-
-NAN_METHOD(anArray) {
-    v8::Local<v8::Array> arr = Nan::New<v8::Array>(3);
-    Nan::Set(arr, 0, Nan::New(1));
-    Nan::Set(arr, 1, Nan::New(2));
-    Nan::Set(arr, 2, Nan::New(3));
-    info.GetReturnValue().Set(arr);
-}
-
-NAN_METHOD(callback) {
-    v8::Local<v8::Function> callbackHandle = info[0].As<v8::Function>();
-    Nan::MakeCallback(Nan::GetCurrentContext()->Global(), callbackHandle, 0, 0);
-}
-
-// Wrapper Impl
-
-Nan::Persistent<v8::Function> MyObject::constructor;
-
-NAN_MODULE_INIT(MyObject::Init) {
-  v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(New);
-  tpl->SetClassName(Nan::New("MyObject").ToLocalChecked());
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
-
-  Nan::SetPrototypeMethod(tpl, "plusOne", PlusOne);
-
-  constructor.Reset(Nan::GetFunction(tpl).ToLocalChecked());
-  Nan::Set(target, Nan::New("MyObject").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
-}
-
-MyObject::MyObject(double value) : value_(value) {
-}
-
-MyObject::~MyObject() {
-}
-
-NAN_METHOD(MyObject::New) {
-  if (info.IsConstructCall()) {
-    double value = info[0]->IsUndefined() ? 0 : Nan::To<double>(info[0]).FromJust();
-    MyObject *obj = new MyObject(value);
-    obj->Wrap(info.This());
-    info.GetReturnValue().Set(info.This());
-  } else {
-    const int argc = 1; 
-    v8::Local<v8::Value> argv[argc] = {info[0]};
-    v8::Local<v8::Function> cons = Nan::New(constructor);
-    info.GetReturnValue().Set(cons->NewInstance(argc, argv));
-  }
-}
-
-NAN_METHOD(MyObject::PlusOne) {
-  MyObject* obj = Nan::ObjectWrap::Unwrap<MyObject>(info.This());
-  obj->value_ += 1;
-  info.GetReturnValue().Set(obj->value_);
+NAN_METHOD(DeepMerge) {
+    v8::Local<v8::Value> target = info[0];
+    v8::Local<v8::Value> src = info[1];
+    if (target->Equals(src)) {
+        info.GetReturnValue().Set(target);
+    } else {
+        info.GetReturnValue().Set(DeepMergeRecursive(target, src));
+    }
 }
