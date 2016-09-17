@@ -38,14 +38,13 @@ flags = [
 '-Wall',
 '-Wextra',
 '-Werror',
-'-Wc++98-compat',
 '-Wno-long-long',
 '-Wno-variadic-macros',
 '-fexceptions',
 '-DNDEBUG',
 # You 100% do NOT need -DUSE_CLANG_COMPLETER in your flags; only the YCM
 # source code needs it.
-'-DUSE_CLANG_COMPLETER',
+# '-DUSE_CLANG_COMPLETER',
 # THIS IS IMPORTANT! Without a "-std=<something>" flag, clang won't know which
 # language to use when compiling headers. So it will guess. Badly. So C++
 # headers will be compiled as C headers. You don't want that so ALWAYS specify
@@ -61,6 +60,8 @@ flags = [
 'c++',
 '-isystem',
 '../BoostParts',
+#'-I',
+#'/usr/include/c++/4.8',
 '-isystem',
 # This path will only work on OS X, but extra paths that don't exist are not
 # harmful
@@ -71,6 +72,10 @@ flags = [
 '../llvm/tools/clang/include',
 '-I',
 '.',
+'-I',
+'node_modules/nan',
+'-I',
+'/usr/include/node',
 '-I',
 './ClangCompleter',
 '-isystem',
@@ -182,4 +187,4 @@ def FlagsForFile( filename, **kwargs ):
     relative_to = DirectoryOfThisScript()
     final_flags = MakeRelativePathsInFlagsAbsolute( flags, relative_to )
 
-  return { 'flags': final_flags }
+  return { 'flags': final_flags, 'do_cache': True }

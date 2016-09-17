@@ -21,7 +21,7 @@
   "gypfile": true,
   "name": "deepmerge-native",
   "description": "[![Build Status](https://travis-ci.org/denghongcai/deepmerge-native.svg)](https://travis-ci.org/denghongcai/deepmerge-native)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "directories": {
     "test": "test"
   },
